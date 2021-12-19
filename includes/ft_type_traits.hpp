@@ -54,28 +54,35 @@ namespace ft {
     // otherwise, there is no member typedef.
     template <bool B, typename T = void>
     struct enable_if : identity<T> {};
-    // specialisation  
+    // specialization  
     template <typename T>
     struct enable_if<false, T> {};
 
 
+    template <typename T>
+    struct is_pointer       : false_type {};
+    // specialization  
+    template <typename T>
+    struct is_pointer<T*>   : true_type {};
+
+    
     template <typename T, typename U>
     struct is_same          : false_type {};
-    // specialisation
+    // specialization
     template <typename T>
     struct is_same<T, T>    : true_type {};
 
 
     template <typename T>
     struct remove_const : identity<T> {};
-    // specialisation
+    // specialization
     template <typename T>
     struct remove_const<T const> : identity<T> {};
 
 
     template <typename T>
     struct remove_volatile : identity<T> {};
-    // specialisation
+    // specialization
     template <typename T>
     struct remove_volatile<T volatile> : identity<T> {};
 
