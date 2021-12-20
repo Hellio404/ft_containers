@@ -48,7 +48,8 @@ namespace ft
         ft_iterator() : it(){};
         ft_iterator(iterator_type const &iter) : it(iter){};
 
-        ft_iterator(ft_iterator<_Titerator, _Tcontainer> const &obj) : it(obj.it){};
+        template <typename _TIter>
+        ft_iterator(ft_iterator<_TIter, _Tcontainer> const &obj) : it(obj.base()){};
 
         ft_iterator &operator=(ft_iterator const &obj)
         {

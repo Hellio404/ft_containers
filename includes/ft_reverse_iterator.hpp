@@ -48,7 +48,8 @@ namespace ft
         reverse_iterator() : it(){};
         reverse_iterator(iterator_type const &iter) : it(iter){};
 
-        reverse_iterator(reverse_iterator<_Titerator> const &obj) : it(obj.it){};
+        template <typename _Titer>
+        reverse_iterator(reverse_iterator<_Titer> const &obj) : it(obj.base()){};
 
         reverse_iterator &operator=(reverse_iterator<_Titerator> const &obj)
         {
