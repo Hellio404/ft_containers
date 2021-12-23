@@ -63,9 +63,9 @@ namespace ft
 
     template <typename T>
     typename iterator_traits<T>::iterator_category
-    get_iterator_category(T it)
+    get_iterator_category()
     {
-        return iterator_traits<T>::iterator_category();
+        return typename iterator_traits<T>::iterator_category();
     }
 
     typedef char yes;

@@ -425,7 +425,7 @@ namespace ft{
         template <class ForwardIterator >
         void    _do_fill_range(ForwardIterator start, ForwardIterator end, true_type)
         {
-            difference_type len = std::distance(start, end);
+            difference_type len = ft::distance(start, end);
             _data._begin = _allocator.allocate(_check_if_valid_size(len));
             _data._end_of_storage = _data._begin + len;
             _data._finish = ft::_range_copy(start, end, _data._begin, _allocator);  
