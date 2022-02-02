@@ -49,7 +49,7 @@ namespace ft{
             pointer _finish;
             pointer _end_of_storage;
 
-            Vector_data(): _begin(), _finish(), _end_of_storage() {}
+            Vector_data(): _begin(0), _finish(0), _end_of_storage(0) {}
 
             Vector_data&    operator=(Vector_data const& obj)
             {
@@ -74,8 +74,9 @@ namespace ft{
             ~_base_data() {};
             void    _replace_data(pointer start, pointer end, pointer end_of_storage)
             {
-                this->allocator_type::deallocate(this->Vector_data::_begin,
-                    size_type(this->Vector_data::_end_of_storage - this->Vector_data::_begin));
+                size_type size = size_type(this->Vector_data::_end_of_storage - this->Vector_data::_begin);
+                if (this->Vector_data::_begin)
+                    this->allocator_type::deallocate(this->Vector_data::_begin, size);
                 this->Vector_data::_begin = start;
                 this->Vector_data::_finish = end;
                 this->Vector_data::_end_of_storage = end_of_storage;
@@ -94,7 +95,7 @@ namespace ft{
 
         pointer _allocate_storage(size_type n)
         {
-            return n > 0 ? _data.allocate(n) : pointer();
+            return n > 0 ? _data.allocate(n) : pointer(0);
         }
 
 
@@ -133,7 +134,7 @@ namespace ft{
         typedef _vector_base<_Tv, _Talloc> _base_type;
     public:
         typedef _Tv value_type;
-        typedef typename _Talloc::template rebind<_Tv>::other allocator_type;
+        typedef typename _Talloc::template rebind<value_type>::other allocator_type;
         typedef typename allocator_type::pointer pointer;
         typedef typename allocator_type::reference reference;
         typedef typename allocator_type::const_reference const_reference;
@@ -154,7 +155,7 @@ namespace ft{
         explicit vector(size_type n, const value_type &val = value_type(),
             const allocator_type &alloc = allocator_type()) : _base_type(_check_if_valid_size(n), alloc)
         {
-            _data._finish = _fill_n_copy<allocator_type>(_data._begin, n, val, _allocator);
+            _data._finish = _fill_n_copy(_data._begin, n, val, _allocator);
         }
 
         template <class InputIterator >
@@ -180,13 +181,12 @@ namespace ft{
             if (this != &x)
             {
                 clear();
-                _data._replace_data(pointer(), pointer(), size_type(0));
-                _data._begin = x._allocator.allocate(x.size());
-                _data._finish = _range_copy(x.begin(), x.end(), _data._begin, _allocator);
+                _data._replace_data(pointer(0), pointer(0), size_type(0));
+                _data._begin = _allocator.allocate(x.size());
                 _data._end_of_storage = _data._begin + x.size();
+                _data._finish = _range_copy(x.begin(), x.end(), _data._begin, _allocator);
             }
             return *this;
-
          }
 
         iterator begin() 
@@ -206,7 +206,7 @@ namespace ft{
 
         const_iterator end() const
         {
-            return const_iterator(const_pointer(_data._finish));
+            return const_iterator(_data._finish);
         }
 
         reverse_iterator rbegin()
@@ -232,7 +232,7 @@ namespace ft{
 
         size_type max_size() const
         {
-            size_type logical_maxSize = std::numeric_limits<size_type>::max() / sizeof(_Tv);
+            size_type logical_maxSize = std::numeric_limits<size_type>::max() / sizeof(value_type);
             size_type allocator_maxSize = _allocator.max_size();
             return ft::min(logical_maxSize, allocator_maxSize);
         }
@@ -293,7 +293,7 @@ namespace ft{
 
         size_type size() const
         {
-            return size_type(_data._finish- _data._begin);
+            return size_type(_data._finish - _data._begin);
         }
 
         void clear()
@@ -315,9 +315,15 @@ namespace ft{
             }
         }
 
+        void pop_back()
+        {
+            ft::destroy(_data._finish - 1, _data._finish, _allocator);
+            _data._finish--;
+        }
+
         void resize (size_type n, value_type val = value_type())
         {
-             pointer expected_new_end = _data._begin + n;
+            pointer expected_new_end = _data._begin + n;
             if (_data._finish > expected_new_end)
             {
                 ft::destroy(expected_new_end, _data._finish, _allocator);
@@ -377,11 +383,76 @@ namespace ft{
         template <class InputIterator>
         void assign (InputIterator first, InputIterator last)
         {
-            
+            _dispatch_fill_range(first, last);
         }
 
-        void assign (size_type n, const value_type& val);
+        void assign (size_type n, const value_type& val)
+        {
+            if (n > capacity())
+            {
+                // this so I can allocate max(n-capacity(), 2 * capacity());
+                size_type to_allocate =_check_if_valid_len(size_type(n - capacity()));
+                pointer _p_begin_tmp = _allocator.allocate(to_allocate);
+                pointer _p_finish_tmp = _p_begin_tmp;
+                try
+                {
+                    _p_finish_tmp = _fill_n_copy(_p_begin_tmp, n, val, _allocator);
+                }
+                catch(...)
+                {
+                    _allocator.deallocate(_p_begin_tmp, to_allocate);
+                    throw ;
+                }
+                ft::destroy(_data._begin, _data._finish, _allocator);
+                _data._replace_data(_p_begin_tmp, _p_finish_tmp, to_allocate);
+            }
+            else
+            {
+                ft::destroy(_data._begin, _data._finish, _allocator);
+                _data._finish = _data._begin;
+                _data._finish = _fill_n_copy(_data._begin, n, val, _allocator);
+            }
+        }
 
+        iterator erase (iterator position)
+        {
+            iterator position_tmp = position;
+
+            while (position + 1 != end())
+            {
+                *position = *(position + 1);
+                ++position;
+            }
+            pop_back();
+            return position_tmp;
+        }
+
+        iterator erase (iterator first, iterator last)
+        {
+            iterator position_tmp = first;
+
+            difference_type n = last - first;
+            while (last != end())
+            {
+                *first = *last;
+                ++first;
+                ++last;
+            }
+            ft::destroy(first, first + n, _allocator);
+            _data._finish -= n;
+            return position_tmp;
+        }
+
+        void swap (vector& x)
+        {
+            _data._V_data_swap(x._data);
+        }
+
+
+        allocator_type get_allocator() const
+        {
+            return _allocator;
+        }
     private:
         void _check_if_valid_range(size_type n)
         {
@@ -406,6 +477,13 @@ namespace ft{
         template <class InputIterator >
         void    _do_fill_range(InputIterator start, InputIterator end, false_type)
         {
+            ft::destroy(_data._begin, _data._finish, _allocator);
+            _data._finish = _data._begin;
+            if (_data._begin)
+            {
+                _allocator.deallocate(_data._begin, capacity());
+                _data._end_of_storage = _data._begin;
+            }
             try
             {
                 while (start != end)
@@ -426,8 +504,20 @@ namespace ft{
         void    _do_fill_range(ForwardIterator start, ForwardIterator end, true_type)
         {
             difference_type len = ft::distance(start, end);
-            _data._begin = _allocator.allocate(_check_if_valid_size(len));
-            _data._end_of_storage = _data._begin + len;
+
+            ft::destroy(_data._begin, _data._finish, _allocator);
+            _data._finish = _data._begin;
+
+            if (size_type(len) > capacity())
+            {
+                if (_data._begin)
+                {
+                    _allocator.deallocate(_data._begin, capacity());
+                    _data._end_of_storage = _data._begin;
+                }
+                _data._begin = _allocator.allocate(_check_if_valid_size(len));
+                _data._end_of_storage = _data._begin + len;
+            }
             _data._finish = ft::_range_copy(start, end, _data._begin, _allocator);  
         }
 
@@ -439,7 +529,7 @@ namespace ft{
         }
 
         void
-        _reallocate_insert(iterator _pos, _Tv const& val)
+        _reallocate_insert(iterator _pos, value_type const& val, size_type n = 1)
         {
             pointer pos = ft::address_of(*_pos);
             size_type _len = _check_if_valid_len(1);
@@ -449,8 +539,7 @@ namespace ft{
             try
             {
                 _current = _range_copy(_data._begin, pos, _new_begin, _allocator);
-                _allocator.construct(ft::address_of(*_current), val);
-                ++_current;
+                _current = _fill_n_copy(_current, n, val, _allocator);
                 _current = _range_copy(pos, _data._finish, _current, _allocator);
                 ft::destroy(begin(), end(), _allocator);
                 _data._replace_data(_new_begin, _current, _len);
