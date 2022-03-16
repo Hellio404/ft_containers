@@ -1,7 +1,7 @@
 NAME    = test
 CC      = g++-11
 FLAGS   = -Wall -Wextra -Werror -I../includes -std=c++98 -Wno-unused-parameter -Wno-unused-local-typedefs -Wno-unused-variable
-SRCS =   test_construct.cpp test_resize.cpp test_reserve.cpp test_resize.cpp  test_resize_hardcore.cpp test_constructor_hardcore.cpp #test_construct.cpp
+SRCS =  test_insert_n.cpp# test_construct.cpp test_resize.cpp test_reserve.cpp test_resize.cpp  test_resize_hardcore.cpp test_constructor_hardcore.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(NAME)

@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <ft_iterator_traits.hpp>
+#include "ft_iterator_traits.hpp"
 namespace ft
 {
 
@@ -83,7 +83,7 @@ namespace ft
         return cur;
     }
 
-    template <typename _InputIterator, bool>
+    template <typename _InputIterator>
     typename ft::iterator_traits<_InputIterator>::difference_type
     _do_distance(_InputIterator start, _InputIterator end, std::input_iterator_tag)
     {
@@ -134,4 +134,53 @@ namespace ft
         return a < b ? b : a;
     }
 
+
+    template <typename T>
+    struct  select1st {
+        typedef T                       argument_type;
+        typedef typename T::first_type  result_type;
+
+        result_type operator()(T const &t) const
+        {
+            return t.first;
+        }
+
+        const result_type &operator()(T const &t)
+        {
+            return t.first;
+        }
+    };
+
+    template <typename T>
+    struct  select2nd {
+        typedef T                       argument_type;
+        typedef typename T::second_type  result_type;
+
+        result_type operator()(T const &t) const
+        {
+            return t.second;
+        }
+
+        const result_type &operator()(T const &t)
+        {
+            return t.second;
+        }
+    };
+
+    template <typename T>
+    struct select_self {
+        typedef T                       argument_type;
+        typedef T                       result_type;
+
+        result_type operator()(T const &t) const
+        {
+            return t;
+        }
+
+        const result_type &operator()(T const &t)
+        {
+            return t;
+        }
+    };
+    
 }

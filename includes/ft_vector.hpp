@@ -22,11 +22,11 @@
 // 
 
 #pragma once
-#include <ft_iterator_traits.hpp>
-#include <ft_iterator.hpp>
-#include <ft_reverse_iterator.hpp>
-#include <ft_type_traits.hpp>
-#include <ft_utils.hpp>
+#include "ft_iterator_traits.hpp"
+#include "ft_iterator.hpp"
+#include "ft_reverse_iterator.hpp"
+#include "ft_type_traits.hpp"
+#include "ft_utils.hpp"
 #include <memory>
 #include <cstddef>
 #include <limits>
@@ -144,7 +144,7 @@ namespace ft{
         typedef ft::reverse_iterator<iterator> reverse_iterator;
         typedef ft::reverse_iterator<const_iterator> const_reverse_iterator;
         typedef typename iterator::difference_type difference_type;
-        typedef size_t size_type;
+        typedef size_t  size_type;
 
         using _base_type::_data;
         using _base_type::_allocator;
@@ -381,7 +381,8 @@ namespace ft{
         }
 
         template <class InputIterator>
-        void assign (InputIterator first, InputIterator last)
+        typename ft::enable_if<!ft::is_integral<InputIterator>::value, void>::type  // void
+        assign (InputIterator first, InputIterator last)
         {
             _dispatch_fill_range(first, last);
         }
@@ -390,7 +391,7 @@ namespace ft{
         {
             if (n > capacity())
             {
-                // this so I can allocate max(n-capacity(), 2 * capacity());
+                // this so I can allocate max(n, 2 * capacity());
                 size_type to_allocate =_check_if_valid_len(size_type(n - capacity()));
                 pointer _p_begin_tmp = _allocator.allocate(to_allocate);
                 pointer _p_finish_tmp = _p_begin_tmp;
@@ -417,11 +418,11 @@ namespace ft{
         iterator erase (iterator position)
         {
             iterator position_tmp = position;
-
-            while (position + 1 != end())
+            pointer _p_pos_tmp = position.base();
+            while (_p_pos_tmp + 1 != _data._finish)
             {
-                *position = *(position + 1);
-                ++position;
+                *_p_pos_tmp = *(_p_pos_tmp + 1);
+                ++_p_pos_tmp;
             }
             pop_back();
             return position_tmp;
@@ -443,6 +444,135 @@ namespace ft{
             return position_tmp;
         }
 
+        template <typename ForwardIterator>
+        void _do_insert_range(iterator position, ForwardIterator first, ForwardIterator last, std::forward_iterator_tag)
+        {
+            size_type n = ft::distance(first, last);
+            if (n > 0)
+            {
+                pointer pos = position.base();
+
+                if (_data._finish + n > _data._end_of_storage)
+                {
+                    size_type _len = _check_if_valid_len(n);
+
+                    pointer _new_begin = _allocator.allocate(_len);
+                    pointer _current = _new_begin;
+                    try
+                    {
+                        _current = _range_copy(_data._begin, pos, _new_begin, _allocator);
+                        _current = _range_copy(first, last, _current, _allocator);
+                        _current = _range_copy(pos, _data._finish, _current, _allocator);
+                        ft::destroy(begin(), end(), _allocator);
+                        _data._replace_data(_new_begin, _current, _len);
+                    }
+                    catch(...)
+                    {
+                        ft::destroy(_new_begin, _current, _allocator);
+                        _allocator.deallocate(_new_begin, _len);
+                        throw ;
+                    }
+                }
+                else
+                {
+                    if (pos + n <= _data._finish)
+                    {
+                        pointer _p_tmp = _data._finish - n;
+                        pointer _old_finish = _data._finish ;
+                        _data._finish = _range_copy(_p_tmp, _data._finish, _data._finish, _allocator);
+                        --_p_tmp;
+                        while (_p_tmp != pos -1)
+                            *--_old_finish = *_p_tmp--;
+                        pointer pos_tmp = pos + n;
+                        while (pos != pos_tmp)
+                            *pos++ = *first++;
+                    }
+                    else
+                    {
+                        pointer old_end = _data._finish;
+                        difference_type n_back = pos + n - _data._finish;
+                        ForwardIterator tmp = first;
+                        for (size_type i = 0; i < n - size_type(n_back); i++)
+                            tmp++;
+                        _data._finish = _range_copy(tmp, last, _data._finish, _allocator);
+                        _data._finish = _range_copy(pos, old_end, _data._finish, _allocator);
+                        pointer pos_tmp = pos + n - n_back;
+                        while (pos != pos_tmp)
+                            *pos++ = *first++;
+                    }
+                }
+            }
+        }
+
+        template <typename InputIterator>
+        void _do_insert_range(iterator position, InputIterator first, InputIterator last, std::input_iterator_tag)
+        {
+
+            vector tmp(first, last, _allocator);
+            insert(position, tmp.begin(), tmp.end());
+        }
+
+
+        template <typename InputIterator>
+        void insert (iterator position, InputIterator first, 
+        typename ft::enable_if<!ft::is_integral<InputIterator>::value, InputIterator>::type last)
+        {
+            _do_insert_range(position, first, last, get_iterator_category<InputIterator>());
+        }
+
+        iterator insert (iterator position, const value_type& val)
+        {
+            difference_type dist = ft::distance(begin(), position);
+            insert(position, 1, val);
+            return begin() + dist;
+        }
+
+        void insert (iterator position, size_type n, const value_type& val)
+        {
+            value_type copy_val = val;
+            if (n > 0)
+            {
+                if (_data._finish + n > _data._end_of_storage)
+                    _reallocate_insert(position, copy_val, n);
+                else
+                {
+                    pointer pos = position.base();
+              
+                    if (pos + n <= _data._finish)
+                    {
+                        pointer _p_tmp = _data._finish - n;
+                        pointer _old_finish = _data._finish ;
+                        _data._finish = _range_copy(_p_tmp, _data._finish, _data._finish, _allocator);
+                        --_p_tmp;
+                        while (_p_tmp != pos -1)
+                            *--_old_finish = *_p_tmp--;
+                        pointer pos_tmp = pos + n;
+                        while (pos != pos_tmp)
+                        {
+                            *pos = copy_val;
+                            ++pos;
+                        }
+                    }
+                    else
+                    {
+                        pointer old_end = _data._finish;
+                        difference_type n_back = pos + n - _data._finish;
+                        _data._finish = _fill_n_copy(_data._finish, n_back, copy_val, _allocator);
+                        _data._finish = _range_copy(pos, old_end, _data._finish, _allocator);
+                        pointer pos_tmp = pos + n - n_back;
+                        while (pos != pos_tmp)
+                        {
+                            *pos = copy_val;
+                            ++pos;
+                        }
+                    }
+
+                }
+            }
+        }
+
+        
+
         void swap (vector& x)
         {
             _data._V_data_swap(x._data);
@@ -454,7 +584,7 @@ namespace ft{
             return _allocator;
         }
     private:
-        void _check_if_valid_range(size_type n)
+        void _check_if_valid_range(size_type n) const
         {
             if (n >= size())
                 throw std::out_of_range("ft::vector index is out of range");
@@ -462,9 +592,9 @@ namespace ft{
 
         size_type _check_if_valid_len(size_type n)
         {
-            _check_if_valid_size(size() + n);
-            size_type len = size() + ft::max(size(), n);
-            return (len < size() || len > max_size()) ? max_size() : len;
+            _check_if_valid_size(capacity() + n);
+            size_type len = capacity() + ft::max(capacity(), n);
+            return (len < capacity() || len > max_size()) ? max_size() : len;
         }
 
         size_type _check_if_valid_size(size_type n)
@@ -531,8 +661,8 @@ namespace ft{
         void
         _reallocate_insert(iterator _pos, value_type const& val, size_type n = 1)
         {
-            pointer pos = ft::address_of(*_pos);
-            size_type _len = _check_if_valid_len(1);
+            pointer pos = _pos.base();
+            size_type _len = _check_if_valid_len(n);
 
             pointer _new_begin = _allocator.allocate(_len);
             pointer _current = _new_begin;
@@ -548,6 +678,7 @@ namespace ft{
             {
                 ft::destroy(_new_begin, _current, _allocator);
                 _allocator.deallocate(_new_begin, _len);
+                throw ;
             }
         }
 
@@ -555,4 +686,14 @@ namespace ft{
         
 
     };
+}
+
+
+
+namespace std {
+    template <class T, class Alloc>
+    void swap (ft::vector<T,Alloc>& x, ft::vector<T,Alloc>& y)
+    {
+        x.swap(y);
+    }
 }

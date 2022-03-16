@@ -24,7 +24,7 @@
 #include <iostream>
 #include <limits>
 #include <vector>
-#include <ft_vector.hpp>
+#include "ft_vector.hpp"
 #include <iomanip>
 int max_to_fail = 9999;
 #define DEBUG_ENABLE 0
@@ -181,7 +181,7 @@ enum equality{
     EQUAL, //0000
     SIZE_DIFF, // 0001
     CONTENT_DIFF, // 010
-    CAPACITY_DIFF // 010
+    CAPACITY_DIFF = 4
 };
 
 template <typename T1, typename T2>

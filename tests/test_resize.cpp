@@ -78,7 +78,22 @@ int main()
         # define UsedType test
         {
           
-            printf("%-40s","Resize 5: (depends on reserve)");
+            printf("%-40s","Resize 5a: (depends on reserve)");
+            std::vector<UsedType, myCustomAllocator<UsedType, std::vector<UsedType> > > a(2);
+            ft::vector<UsedType, myCustomAllocator<UsedType, ft::vector<UsedType> > > b(2);
+            a.reserve(150);
+            b.reserve(150);
+            a.resize(151);
+            b.resize(151);
+            print_res(check_equal(a, b));
+        }
+        print_leaks<UsedType>();
+        #undef UsedType
+
+        # define UsedType test
+        {
+          
+            printf("%-40s","Resize 5b: (depends on reserve)");
             std::vector<UsedType, myCustomAllocator<UsedType, std::vector<UsedType> > > a(2);
             ft::vector<UsedType, myCustomAllocator<UsedType, ft::vector<UsedType> > > b(2);
             a.reserve(15);

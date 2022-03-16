@@ -1,7 +1,7 @@
 NAME    = test
-CC      = g++-11
-FLAGS   = -Wall -Wextra -Werror -Iincludes -std=c++98 -Wno-unused-parameter -Wno-unused-local-typedefs -Wno-unused-variable
-SRCS = test.cpp
+CC      = g++
+FLAGS   = -Wall -Wextra -Werror -Iincludes -std=c++98 -Wno-unused-parameter -Wno-unused-local-typedefs -Wno-unused-variable -g -fsanitize=address
+SRCS = test.cpp utils/utils_tree.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(NAME)

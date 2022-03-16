@@ -45,7 +45,7 @@ namespace ft {
 
     // alias for intergal_constant<bool, false>
     struct false_type   : bool_constant <false> {};
-    // alias for intergal_constant<bool, false>
+    // alias for intergal_constant<bool, true>
     struct true_type    : bool_constant <true> {};
 
     template <bool _cond, typename _IfTrue, typename _IfFalse>
