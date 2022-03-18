@@ -60,6 +60,7 @@ namespace ft
     class tree_iterator
     {
     public:
+        typedef tree_iterator<_T>                   non_const_iterator;
         typedef std::bidirectional_iterator_tag     iterator_category;
         typedef ptrdiff_t                           difference_type;
         typedef _T                                  value_type;
@@ -106,7 +107,7 @@ namespace ft
             return tmp;
         }
         
-        node_base_ptr get_node() const { return _node; }
+        node_base_ptr base() const { return _node; }
 
         bool operator==(const iterator &other) const { return _node == other._node; }
         bool operator!=(const iterator &other) const { return _node != other._node; }
@@ -119,6 +120,7 @@ namespace ft
     class tree_const_iterator
     {
     public:
+        typedef tree_iterator<_T>                   non_const_iterator;
         typedef std::bidirectional_iterator_tag     iterator_category;
         typedef ptrdiff_t                           difference_type;
         typedef size_t                              size_type;
@@ -167,11 +169,11 @@ namespace ft
             return tmp;
         }
         
-        node_base_ptr get_node() const { return _node; }
+        node_base_ptr base() const { return _node; }
 
-        bool operator==(const tree_const_iterator &rhs) { return _node == rhs._node; }
+        bool operator==(const tree_const_iterator &rhs) const  { return _node == rhs._node; }
 
-        bool operator!=(const tree_const_iterator &rhs) { return _node != rhs._node; }
+        bool operator!=(const tree_const_iterator &rhs) const  { return _node != rhs._node; }
 
     };
 
@@ -200,7 +202,6 @@ namespace ft
         typedef ValueType                                           value_type;
         typedef rbtree_node<T>                                      node_t;
         typedef Compare                                             key_compare;
-        typedef Compare                                             value_compare;
         typedef typename Alloc::template rebind<node_t>::other      allocator_type;
         typedef T&                                                  reference;
         typedef const T&                                            const_reference;
@@ -218,6 +219,20 @@ namespace ft
         typedef tree_end_node<node_base_ptr>                        end_node_t;
         typedef tree_end_node<node_base_ptr>*                       end_node_ptr;
 
+
+        class value_compare: public std::binary_function<value_type,value_type,bool>
+        {
+            friend class Tree;
+
+        protected:
+            value_compare(Compare c) : comp(c) {}
+            Compare comp;
+        public:
+            bool operator()(const value_type &x, const value_type &y) const
+            {
+                return comp(key_of_value()(x), key_of_value()(y));
+            }
+        };
         
         node_base_ptr                                   begin_node;
         end_node_t                                      end_node;
@@ -227,24 +242,36 @@ namespace ft
 
 
         node_base_ptr                       _end_node() { return static_cast<tree_node_base*>(&end_node); };
+        node_base_ptr                       _end_node() const { return static_cast<tree_node_base*>(
+                                                                        const_cast<end_node_ptr>(&end_node)); };
+        
+        
         node_base_ptr&                      _begin_node() { return begin_node; };
         const node_base_ptr&                _begin_node() const { return begin_node; };
-        node_base_ptr                       _root() { return _end_node()->left; };
+
+        node_base_ptr&                       _root() { return _end_node()->left; };
+        const node_base_ptr&                 _root() const { return _end_node()->left; };
 
 
         iterator                            begin() { return iterator(_begin_node()); };
-        iterator                            end() { return iterator(_end_node()); };
         const_iterator                      begin() const { return const_iterator(_begin_node()); };
+
+        iterator                            end() { return iterator(_end_node()); };
         const_iterator                      end() const { return const_iterator(_end_node()); };
+
         reverse_iterator                    rbegin() { return reverse_iterator(end()); };
-        reverse_iterator                    rend() { return reverse_iterator(begin()); };
         const_reverse_iterator              rbegin() const { return const_reverse_iterator(end()); };
+
+        reverse_iterator                    rend() { return reverse_iterator(begin()); };
         const_reverse_iterator              rend() const { return const_reverse_iterator(begin()); };
 
 
         bool empty() const { return _size == 0; }
         size_type size() const { return _size;  }
-        size_type max_size() const{ return size_type(-1); } // TODO}
+        size_type max_size() const
+        { 
+            return size_type(allocator.max_size()); 
+        }
 
 
         Tree(const Compare &comp = Compare(), const allocator_type &alloc = allocator_type()) : end_node(), _comp(comp), allocator(alloc), _size(0)
@@ -255,7 +282,28 @@ namespace ft
         Tree(const Tree &other) : end_node(), _comp(other._comp), allocator(other.allocator), _size(0)
         {
             begin_node = _end_node();
-            // todo use iterators to copy
+            const_iterator it = other.begin();
+            while (it != other.end())
+                insert_multi(*it++);
+        }
+
+        ~Tree()
+        {
+            clear();
+        }
+
+        Tree& operator=(const Tree &other)
+        {
+            if (this != &other)
+            {
+                clear();
+                _comp = other._comp;
+                _size = 0;
+                const_iterator it = other.begin();
+                while (it != other.end())
+                    insert_multi(*it++);
+            }
+            return *this;
         }
 
 
@@ -312,6 +360,7 @@ namespace ft
 
         node_base_ptr   erase(node_base_ptr node, node_base_ptr parent)
         {
+            _size--;
             if (node == this->_begin_node())
                 this->_begin_node() = tree_next_node(node);
             node_base_ptr x;
@@ -323,11 +372,17 @@ namespace ft
                 y = tree_minimum(node->right);
                 y_original_color = _color(_rb(y));
                 x = y->right;
+                _rb(y)->color = _rb(node)->color;
+
                 if (y->parent != node)
+                {
                     x_parent = y->parent;
+                    if (x)
+                        x->parent = x_parent;
+                }
                 else
                     x_parent = y;
-                _rb(y)->color = _rb(node)->color;
+
                 if (tree_is_left_node(y))
                     y->parent->left = y->right;
                 else
@@ -439,7 +494,12 @@ namespace ft
 
         void    erase_iter(iterator node)
         {
-            this->erase(node.get_node(), node.get_node()->parent);
+            this->erase(node.base(), node.base()->parent);
+        }
+
+        void    erase_iter(const_iterator node)
+        {
+            this->erase(node.base(), node.base()->parent);
         }
 
         void    erase_iter(iterator first, iterator end)
@@ -455,7 +515,6 @@ namespace ft
             if (node == NULL)
                 return 0;
             erase(node, parent);
-            --_size;
             return 1;
         }
 
@@ -476,7 +535,6 @@ namespace ft
                 else
                     parent = node->parent;
                 ++count;
-                --_size;
             }
             return count;
         }
@@ -503,9 +561,10 @@ namespace ft
                 node->parent = parent;
                 if (_begin_node()->left)
                     _begin_node() = _begin_node()->left;
+                node_base_ptr new_node = node;
                 _rebalance_after_insert(static_cast<node_ptr>(node));
                 ++_size;
-                return ft::make_pair(iterator(node), true);
+                return ft::make_pair(iterator(new_node), true);
             }
         }
 
@@ -524,6 +583,8 @@ namespace ft
                 throw;
             }
             node->parent = parent;
+            if (_begin_node()->left)
+                _begin_node() = _begin_node()->left;
             _rebalance_after_insert(static_cast<node_ptr>(node));
             ++_size;
             return ft::make_pair(iterator(node), true);
@@ -639,18 +700,170 @@ namespace ft
 
         iterator lower_bound (const key_type& k)
         {
-
-            node_base_ptr parent;
-            node_base_ptr node = find_unique_position(k, parent);
-            if (node || !_comp(key_of_value()(static_cast<node_ptr>(parent)->value), k))
-                return iterator(parent);
-            else
-                return ++iterator(parent);
+            node_base_ptr root = this->_root();
+            node_base_ptr lower_bound = this->_end_node();
+            while (root && root != this->_end_node())
+            {
+                 if (_comp(k, key_of_value()(static_cast<node_ptr>(root)->value)))
+                 {
+                    lower_bound = root;
+                    root = root->left;
+                 }
+                else if (_comp(key_of_value()(static_cast<node_ptr>(root)->value), k))
+                    root = root->right;
+                else
+                    return iterator(root);
+            }
+           
+            return iterator(lower_bound);
         }
 
+        const_iterator lower_bound (const key_type& k) const
+        {
+            node_base_ptr root = this->_root();
+            node_base_ptr lower_bound = this->_end_node();
+            while (root && root != this->_end_node())
+            {
+                 if (_comp(k, key_of_value()(static_cast<node_ptr>(root)->value)))
+                 {
+                    lower_bound = root;
+                    root = root->left;
+                 }
+                else if (_comp(key_of_value()(static_cast<node_ptr>(root)->value), k))
+                    root = root->right;
+                else
+                    return const_iterator(root);
+            }
+           
+            return const_iterator(lower_bound);
+        }
+
+
+        iterator upper_bound (const key_type& k)
+        {
+            node_base_ptr root = this->_root();
+            node_base_ptr upper_bound = this->_end_node();
+            while (root && root != this->_end_node())
+            {
+                 if (_comp(k, key_of_value()(static_cast<node_ptr>(root)->value)))
+                 {
+                    upper_bound = root;
+                    root = root->left;
+                 }
+                else if (_comp(key_of_value()(static_cast<node_ptr>(root)->value), k))
+                    root = root->right;
+                else
+                    return ++iterator(root);
+            }
+           
+            return iterator(upper_bound);
+        }
+
+
+        const_iterator upper_bound (const key_type& k) const
+        {
+            node_base_ptr root = this->_root();
+            node_base_ptr upper_bound = this->_end_node();
+            while (root && root != this->_end_node())
+            {
+                 if (_comp(k, key_of_value()(static_cast<node_ptr>(root)->value)))
+                 {
+                    upper_bound = root;
+                    root = root->left;
+                 }
+                else if (_comp(key_of_value()(static_cast<node_ptr>(root)->value), k))
+                    root = root->right;
+                else
+                    return ++const_iterator(root);
+            }
+           
+            return const_iterator(upper_bound);
+        }
+
+        ft::pair<iterator, iterator> equal_range (const key_type& k)
+        {
+            return ft::make_pair(lower_bound(k), upper_bound(k));
+        }
+
+        ft::pair<const_iterator, const_iterator> equal_range (const key_type& k) const
+        {
+            return ft::make_pair(lower_bound(k), upper_bound(k));
+        }
+
+        size_type count (const key_type& k) const
+        {
+            ft::pair<const_iterator, const_iterator> p = equal_range(k);
+            return size_type(ft::distance(p.first, p.second));
+        }
+
+        allocator_type get_allocator() const
+        {
+            return allocator;
+        }
+
+        value_compare value_comp() const
+        {
+            return value_compare(_comp);
+        }
+
+        void swap (Tree& t)
+        {
+       
+            ft::swap(end_node, t.end_node);
+            ft::swap(begin_node, t.begin_node);
+            ft::swap(_size, t._size);
+            ft::swap(_comp, t._comp);
+
+            if (t.size() != 0)
+                t._root()->parent = t._end_node();
+            else
+                t._begin_node() = t._end_node();
+                
+            if (this->size() != 0)
+                this->_root()->parent = this->_end_node();
+            else
+                this->_begin_node() = this->_end_node();
+
+        }
+        
     }; // class Tree
 
-} // namespace ft_dev
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator== (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return lhs.size() == rhs.size() && ft::equal(lhs.begin(), lhs.end(), rhs.begin());
+    }
+
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator!= (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator< (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return ft::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    }
+
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator<= (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return !(rhs < lhs);
+    }
+
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator> (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return rhs < lhs;
+    }
+
+    template <typename T, typename KeyOf,typename KeyType, typename ValueType, typename Compare, typename Alloc>
+    bool operator>= (const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& lhs, const Tree<T, KeyOf, KeyType, ValueType, Compare, Alloc>& rhs)
+    {
+        return !(lhs < rhs);
+    }
 
 
+} // namespace ft
 

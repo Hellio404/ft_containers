@@ -3,7 +3,7 @@
 
 namespace ft
 {
-    tree_node_base *tree_minimum(tree_node_base *node)
+     tree_node_base *tree_minimum(tree_node_base *node)
     {
         while (node->left)
             node = node->left;
